@@ -1,8 +1,7 @@
 <script lang="ts">
-    import type { Player, Edge, Resource } from "../types";
+    import type { Player, Edge, Resource, Game } from "../types";
 
-    import { fade, scale } from "svelte/transition";
-    import { cubicOut } from "svelte/easing";
+    import { fade } from "svelte/transition";
 
     let {
         game,
@@ -11,33 +10,30 @@
         clickVertex,
         buildRoad,
         moveRobber,
-        hexCorners,
+        hexCornersString,
         hexToPixel,
         resourceImage,
         hexSize,
+        playerId,
         ports,
     }: {
         game: any;
         edges: Edge[];
         vertices: Vertex[];
-        clickVertex: (v: Vertex) => void;
-        buildRoad: (e: Edge) => void;
-        moveRobber: (tile: any) => void;
-        hexCorners: {
-            (x: number, y: number, asString: true): string;
-            (
-                x: number,
-                y: number,
-                asString?: false | undefined,
-            ): { x: number; y: number }[];
-        };
-        hexToPixel: (q: number, r: number) => { x: number; y: number };
+        clickVertex: (game: Game, v: Vertex) => void;
+        buildRoad: (game: Game, e: Edge) => void;
+        moveRobber: (game: Game, tile: any, playerId: string, hexSize: number) => void;
+        hexCornersString: (x: number, y: number, hexSize: number) => string;
+        hexToPixel: (q: number, r: number, hexSize: number) => { x: number; y: number };
         resourceImage: Record<Resource, string | null>;
         hexSize: number;
+        playerId: string;
         ports: any[];
     } = $props();
 
     const vertexMap = $derived(() => new Map(vertices.map((v) => [v.key, v])));
+    const OFFSET_X = 450;
+    const OFFSET_Y = 350;
 
     type Vertex = {
         key: string;
@@ -52,18 +48,18 @@
 <svg width="900" height="700">
     <defs>
         {#each game.board as tile, i}
-            {@const pos = hexToPixel(tile.q, tile.r)}
-            {@const x = pos.x + 450}
-            {@const y = pos.y + 350}
+            {@const pos = hexToPixel(tile.q, tile.r, hexSize)}
+            {@const x = pos.x + OFFSET_X}
+            {@const y = pos.y + OFFSET_Y}
             <clipPath id={"hex-" + i}>
-                <polygon points={hexCorners(x, y, true)} />
+                <polygon points={hexCornersString(x, y, hexSize)} />
             </clipPath>
         {/each}
     </defs>
     {#each game.board as tile, i}
-        {@const pos = hexToPixel(tile.q, tile.r)}
-        {@const x = pos.x + 450}
-        {@const y = pos.y + 350}
+        {@const pos = hexToPixel(tile.q, tile.r, hexSize)}
+        {@const x = pos.x + OFFSET_X}
+        {@const y = pos.y + OFFSET_Y}
         {@const img = resourceImage[tile.resource as Resource]}
         {#if img}
             <image
@@ -78,12 +74,12 @@
             />
         {/if}
         <polygon
-            points={hexCorners(x, y, true)}
+            points={hexCornersString(x, y, hexSize)}
             fill="transparent"
             stroke="#451a03"
             stroke-width="1"
-            onclick={() => moveRobber(tile)}
-            onkeydown={() => moveRobber(tile)}
+            onclick={() => moveRobber(game, tile, playerId, hexSize)}
+            onkeydown={() => moveRobber(game, tile, playerId, hexSize)}
             role="button"
             tabindex="-1"
         />
@@ -108,10 +104,10 @@
         {@const road = edgeLookup().get(e.key)}
         <line
             class="cursor-pointer"
-            x1={e.a.x}
-            y1={e.a.y}
-            x2={e.b.x}
-            y2={e.b.y}
+            x1={e.a.x + OFFSET_X}
+            y1={e.a.y + OFFSET_Y}
+            x2={e.b.x + OFFSET_X}
+            y2={e.b.y + OFFSET_Y}
             stroke="#451a03"
             stroke-width="8"
             stroke-linecap="round"
@@ -119,17 +115,17 @@
         <line
             in:fade={{ duration: 200 }}
             class="cursor-pointer transition-colors duration-200 road-build"
-            x1={e.a.x}
-            y1={e.a.y}
-            x2={e.b.x}
-            y2={e.b.y}
+            x1={e.a.x + OFFSET_X}
+            y1={e.a.y + OFFSET_Y}
+            x2={e.b.x + OFFSET_X}
+            y2={e.b.y + OFFSET_Y}
             stroke={road
                 ? game.players.find((p: Player) => p.id === road.player)?.color
                 : "#fef3c7"}
             stroke-width="6"
             stroke-linecap="round"
-            onclick={() => buildRoad(e)}
-            onkeydown={() => buildRoad(e)}
+            onclick={() => buildRoad(game, e)}
+            onkeydown={() => buildRoad(game, e)}
             role="button"
             tabindex="-1"
         />
@@ -143,29 +139,29 @@
         {#if settlement?.city}
             <rect
                 class="cursor-pointer transition-colors duration-200"
-                x={v.x - 9}
-                y={v.y - 9}
+                x={v.x + OFFSET_X - 9}
+                y={v.y + OFFSET_Y - 9}
                 width="18"
                 height="18"
                 fill={color}
                 stroke="#451a03"
                 stroke-width="1.5"
-                onclick={() => clickVertex(v)}
-                onkeydown={() => clickVertex(v)}
+                onclick={() => clickVertex(game, v)}
+                onkeydown={() => clickVertex(game, v)}
                 role="button"
                 tabindex="-1"
             />
         {:else}
             <circle
                 class="cursor-pointer transition-colors duration-200"
-                cx={v.x}
-                cy={v.y}
+                cx={v.x + OFFSET_X}
+                cy={v.y + OFFSET_Y}
                 r="8"
                 fill={color}
                 stroke="#451a03"
                 stroke-width="1.5"
-                onclick={() => clickVertex(v)}
-                onkeydown={() => clickVertex(v)}
+                onclick={() => clickVertex(game, v)}
+                onkeydown={() => clickVertex(game, v)}
                 role="button"
                 tabindex="-1"
             />
@@ -182,11 +178,14 @@
                 {@const mx = (v1.x + v2.x) / 2}
                 {@const my = (v1.y + v2.y) / 2}
 
-                {@const cx = (mx + water.x) / 2}
-                {@const cy = (my + water.y) / 2}
+                {@const wx = water.x}
+                {@const wy = water.y}
 
-                {@const dx = water.x - mx}
-                {@const dy = water.y - my}
+                {@const cx = (mx + wx) / 2}
+                {@const cy = (my + wy) / 2}
+
+                {@const dx = wx - mx}
+                {@const dy = wy - my}
 
                 {@const len = Math.sqrt(dx * dx + dy * dy) || 1}
                 {@const ux = dx / len}
@@ -197,11 +196,10 @@
 
                 {@const anchor =
                     ux > 0.3 ? "start" : ux < -0.3 ? "end" : "middle"}
-
                 <g>
                     <circle
-                        {cx}
-                        {cy}
+                        cx={cx + OFFSET_X}
+                        cy={cy + OFFSET_Y}
                         r="10"
                         fill="white"
                         stroke="#451a03"
@@ -209,35 +207,35 @@
                     />
 
                     <line
-                        x1={v1.x}
-                        y1={v1.y}
-                        x2={cx}
-                        y2={cy}
+                        x1={v1.x + OFFSET_X}
+                        y1={v1.y + OFFSET_Y}
+                        x2={cx + OFFSET_X}
+                        y2={cy + OFFSET_Y}
                         stroke="white"
                         stroke-width="4"
                     />
 
                     <line
-                        x1={v2.x}
-                        y1={v2.y}
-                        x2={cx}
-                        y2={cy}
+                        x1={v2.x + OFFSET_X}
+                        y1={v2.y + OFFSET_Y}
+                        x2={cx + OFFSET_X}
+                        y2={cy + OFFSET_Y}
                         stroke="white"
                         stroke-width="4"
                     />
 
                     <text
-                        x={labelX}
-                        y={labelY}
+                        x={labelX + OFFSET_X}
+                        y={labelY + OFFSET_Y}
                         text-anchor={anchor}
                         font-size="12"
                         font-weight="bold"
                         fill="#fffbeb"
                     >
-                        <tspan x={labelX}>{port.ratio}:1</tspan>
+                        <tspan x={labelX + OFFSET_X}>{port.ratio}:1</tspan>
                         {#if port.resource}
                             <tspan
-                                x={labelX}
+                                x={labelX + OFFSET_X}
                                 dy="12"
                                 style="text-transform:uppercase"
                             >

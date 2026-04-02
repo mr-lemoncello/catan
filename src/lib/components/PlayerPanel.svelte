@@ -1,11 +1,13 @@
 <script lang="ts">
     import type { Player, Resource } from "../types";
 
+    import Multiplayer from "./Multiplayer.svelte";
+    import type MultiplayerType from "./Multiplayer.svelte";
+
     import { fade, scale, fly } from "svelte/transition";
 
     let {
         game,
-        rollDice,
         endTurn,
         discardResource,
         buyDevCard,
@@ -14,8 +16,10 @@
         getTradeRatio,
         yearOfPlenty,
         monopoly,
-        notification,
+        rollDice,
     } = $props();
+
+    let multiplayerComp: MultiplayerType;
 
     const resources: Resource[] = ["wood", "brick", "sheep", "wheat", "ore"];
 
@@ -34,15 +38,6 @@
     function doTrade() {
         bankTrade(give, want);
     }
-
-    function animatedRoll() {
-        rolling = true;
-        rollDice();
-
-        setTimeout(() => {
-            rolling = false;
-        }, 500);
-    }
 </script>
 
 <div class="flex flex-col gap-5 w-80">
@@ -58,7 +53,7 @@
         {#if game.phase === "roll"}
             <button
                 class="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
-                onclick={animatedRoll}
+                onclick={() => (game = rollDice(game))}
             >
                 Roll Dice
             </button>
@@ -242,13 +237,13 @@
         {/each}
     </div>
 
-    {#if notification}
+    {#if game.notification}
         <div
             in:scale={{ duration: 200 }}
             class="fixed inset-0 bg-black/70 flex items-center justify-center"
         >
             <div class="bg-white p-8 rounded text-xl">
-                {notification}
+                {game.notification}
             </div>
         </div>
     {/if}

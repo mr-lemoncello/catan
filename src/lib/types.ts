@@ -16,60 +16,67 @@ export type Tile = {
     number?: number;
 };
 
-export type Vertex = { key: string; x: number; y: number };
-export type Edge = { key: string; a: Vertex; b: Vertex };
+export type Vertex = { key: string; x: number; y: number; city?: boolean; player?: string };
+export type Edge = { key: string; a: Vertex; b: Vertex; player?: string };
 
 export type Settlement = {
-    player: number;
+    player: string;
     city: boolean;
 };
 
 export type Road = {
-    player: number;
+    player: string;
 };
 
 export type Player = {
-    id: number;
+    id: string;
     name: string;
     color: string;
 
     resources: Record<BuildResource, number>;
 
-    roads: number;
-    settlements: number;
-    cities: number;
+    roadsBuilt: number;
+    settlementsBuilt: number;
+    citiesBuilt: number;
 
     victoryPoints: number;
-    devCards: DevCard[]
-    newDevCards: DevCard[]
+    devCards: DevCard[];
+    freeRoads: number;
+    newDevCards: DevCard[];
     knightsPlayed: number;
 };
 
-export type GameState = {
-    players: Player[];
-    currentPlayer: number;
-
+export type Game = {
     board: Tile[];
+    ports: Port[];
 
     vertices: Map<string, Settlement | null>;
     edges: Map<string, Road | null>;
+    players: Player[];
+    currentPlayer: number;
 
     robber: { q: number; r: number };
 
-    dice: number | null;
-
-    ports: Port[];
+    dice?: number;
 
     phase: GamePhase;
-    discardQueue: Map<number, number>;
+    discardQueue: Map<string, number>;
 
-    longestRoadOwner: number | null;
+    devDeck: DevCard[];
+
+    longestRoadOwner?: string;
     longestRoadLength: number;
 
-    largestArmyOwner: number | null;
+    largestArmyOwner?: string;
     largestArmySize: number;
 
-    winner: number | null;
+    winner?: string;
+    notification: string | null;
+};
+
+export type GameInstance = {
+    id: string;
+    state: Game;
 };
 
 export type DevCard =
@@ -89,7 +96,8 @@ export type GamePhase =
     | "build"
     | "game-over"
     | "year-of-plenty"
-    | "monopoly";
+    | "monopoly"
+    | "road-building";
 
 export type Port = {
     vertices: [string, string];
@@ -97,3 +105,5 @@ export type Port = {
     resource?: BuildResource;
     water: { x: number; y: number };
 };
+
+export const hexSize = 60;
